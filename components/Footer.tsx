@@ -25,7 +25,7 @@ export default function Footer() {
 
         {/* Quick Links */}
         <div className="flex items-center gap-6 text-[10px] font-bold tracking-wider text-zinc-400">
-          <a href={`${prefix}#statistics`} className="hover:text-neon-cyan transition-colors font-display">STATISTICS</a>
+          <a href="/" className="hover:text-neon-cyan transition-colors font-display">HOME</a>
           <a href="/directory" className={`hover:text-neon-cyan transition-colors font-display ${pathname === "/directory" ? "text-neon-cyan font-bold" : ""}`}>
             DIRECTORY
           </a>

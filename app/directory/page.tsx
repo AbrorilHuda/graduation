@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Award,
   Search,
@@ -12,90 +12,22 @@ import ParticleBackground from "@/components/ParticleBackground";
 import ScratchCard from "@/components/ScratchCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-
-// Student Directory Mock Data
-interface Student {
-  nim: string;
-  name: string;
-  specialization: "Business Intelligence" | "Smart Agriculture";
-  status: "Graduated" | "Defense Completed" | "Seminar Completed";
-  title: string;
-  quote: string;
-  image: string;
-  theme: string;
-  glowClass: string;
-  badgeClass: string;
-  milestones: {
-    proposal: boolean;
-    seminar: boolean;
-    defense: boolean;
-    graduation: boolean;
-  };
-}
-
-const graduatesData: Student[] = [
-  {
-    nim: "220101014",
-    name: "Clara Dian Paramitha",
-    specialization: "Business Intelligence",
-    status: "Graduated",
-    title: "S.Kom.",
-    quote: "Analyzing data taught me how to find truth; four years of friendship taught me how to find joy.",
-    image: "/images/student_1.png",
-    theme: "from-purple-500 via-pink-500 to-indigo-600",
-    glowClass: "glow-hover-gold",
-    badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    milestones: { proposal: true, seminar: true, defense: true, graduation: true }
-  },
-  {
-    nim: "220101032",
-    name: "Fahri Hamzah",
-    specialization: "Smart Agriculture",
-    status: "Defense Completed",
-    title: "S.Kom. (Cand.)",
-    quote: "Code that irrigation micro-sensor right, and you feed a village. We made every single loop count.",
-    image: "/images/student_2.png",
-    theme: "from-cyan-500 via-blue-500 to-indigo-600",
-    glowClass: "glow-hover-blue",
-    badgeClass: "bg-neon-blue/10 text-neon-blue border-neon-blue/20",
-    milestones: { proposal: true, seminar: true, defense: true, graduation: false }
-  },
-  {
-    nim: "220101048",
-    name: "Gita Lestari",
-    specialization: "Business Intelligence",
-    status: "Seminar Completed",
-    title: "S.Kom. (Cand.)",
-    quote: "Behind every intelligence report is a testament of our collaborative lab nights.",
-    image: "/images/student_3.png",
-    theme: "from-fuchsia-500 to-pink-600",
-    glowClass: "glow-hover-purple",
-    badgeClass: "bg-neon-purple/10 text-neon-purple border-neon-purple/20",
-    milestones: { proposal: true, seminar: true, defense: false, graduation: false }
-  },
-  {
-    nim: "220101089",
-    name: "Kevin Wijaya",
-    specialization: "Smart Agriculture",
-    status: "Graduated",
-    title: "S.Kom.",
-    quote: "From soil monitoring IoT nodes to the graduation stage, our growth was beautiful.",
-    image: "/images/student_4.png",
-    theme: "from-emerald-500 via-teal-500 to-cyan-500",
-    glowClass: "glow-hover-gold",
-    badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    milestones: { proposal: true, seminar: true, defense: true, graduation: true }
-  }
-];
+import { Student, getStoredStudents } from "@/components/db";
 
 export default function DirectoryPage() {
+  const [graduates, setGraduates] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"All" | "Business Intelligence" | "Smart Agriculture">("All");
-  const [activeStatus, setActiveStatus] = useState<"All" | "Seminar Completed" | "Defense Completed" | "Graduated">("All");
+  const [activeStatus, setActiveStatus] = useState<"All" | "Seminar Completed" | "Defense Completed" | "Graduated" | "Thesis In Progress">("All");
   const [claimStatus, setClaimStatus] = useState(false);
 
+  // Load graduates dynamically from storage
+  useEffect(() => {
+    setGraduates(getStoredStudents());
+  }, []);
+
   // Multi-dimensional Filter Directory Logic
-  const filteredGraduates = graduatesData.filter((grad) => {
+  const filteredGraduates = graduates.filter((grad) => {
     const matchesSearch =
       grad.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       grad.nim.includes(searchQuery);
@@ -108,11 +40,15 @@ export default function DirectoryPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-void font-sans select-none overflow-x-hidden text-zinc-100">
+
+      {/* 1. STICKY NAVBAR */}
       <Navbar />
 
+      {/* 2. THE GRADUATES HERO BANNER (Compact) */}
       <header className="relative min-h-[45vh] flex items-center justify-center pt-32 pb-16 px-4 overflow-hidden cyber-grid">
         <ParticleBackground />
 
+        {/* Glow Spheres */}
         <div className="absolute top-1/4 left-1/3 w-[35vw] h-[35vw] max-w-[350px] rounded-full bg-neon-purple/10 blur-[100px] -z-10 animate-float-slow" />
         <div className="absolute bottom-1/4 right-1/4 w-[30vw] h-[30vw] max-w-[300px] rounded-full bg-neon-blue/10 blur-[80px] -z-10 animate-float-medium" />
 
@@ -137,34 +73,50 @@ export default function DirectoryPage() {
         </div>
       </header>
 
-      {/*SEARCH & FILTER */}
-      <section className="relative py-8 px-4 max-w-7xl mx-auto w-full z-20">
-        <div className="p-6 rounded-2xl glass-panel border border-white/10 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 shadow-2xl">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-full lg:max-w-md">
+      {/* 3. SEARCH & FILTER COMMAND STATION */}
+      <section className="relative py-12 px-4 max-w-7xl mx-auto w-full z-20 space-y-8">
+
+        {/* Large, Futuristic Search Box */}
+        <div className="glass-panel border border-white/10 p-2 rounded-2xl shadow-2xl relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-neon-purple/5 to-neon-cyan/5 rounded-2xl pointer-events-none" />
+          <div className="relative flex items-center">
+            <Search size={20} className="absolute left-6 text-zinc-400 animate-pulse shrink-0" />
             <input
               type="text"
-              placeholder="Search graduates by name or NIM..."
+              placeholder="Search classmates by name, credentials, or NIM (e.g. clara, 220101)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-950/80 text-sm text-zinc-200 pl-11 pr-4 py-3 rounded-xl border border-white/5 focus:border-neon-cyan/40 focus:outline-none transition-all focus:ring-1 focus:ring-neon-cyan/20 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]"
+              className="w-full bg-zinc-950/40 text-base text-zinc-200 pl-16 pr-6 py-4 rounded-xl border-none focus:outline-none transition-all focus:ring-0 placeholder:text-zinc-500"
             />
-            <Search size={16} className="absolute left-4 top-4 text-zinc-500" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-4 text-xs font-bold tracking-widest text-zinc-500 hover:text-neon-cyan uppercase px-3 py-1.5 rounded-lg bg-zinc-950/60 border border-white/5 hover:border-neon-cyan/20 transition-all font-display shrink-0"
+              >
+                Clear
+              </button>
+            )}
           </div>
+        </div>
 
-          {/* Filters Container */}
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-6">
-            {/* Specialization Filter */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] text-zinc-500 tracking-wider uppercase font-bold mr-1">
-                Specialization:
-              </span>
+        {/* Filter Command Bar */}
+        <div className="glass-panel border border-white/10 p-6 md:p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-8 relative overflow-hidden bg-gradient-to-b from-zinc-950/60 to-zinc-950/20">
+
+          <div className="absolute top-0 left-0 w-24 h-[1px] bg-gradient-to-r from-neon-purple to-transparent" />
+          <div className="absolute bottom-0 right-0 w-24 h-[1px] bg-gradient-to-l from-neon-cyan to-transparent" />
+
+          {/* Group 1: Specialization Selection */}
+          <div className="space-y-3 flex-1">
+            <span className="text-[10px] text-zinc-400 tracking-[0.2em] uppercase font-extrabold font-display block">
+              Specialization Focus Tracks
+            </span>
+            <div className="flex flex-wrap gap-2.5">
               {["All", "Business Intelligence", "Smart Agriculture"].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setActiveFilter(filter as any)}
-                  className={`px-3.5 py-2 rounded-xl text-[10px] font-bold tracking-wider uppercase transition-all duration-300 border ${activeFilter === filter
-                    ? "bg-zinc-800 text-neon-cyan border-neon-cyan/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+                  className={`px-4 py-2.5 rounded-xl text-[10px] font-extrabold tracking-widest uppercase transition-all duration-300 border font-display cursor-pointer ${activeFilter === filter
+                    ? "bg-zinc-800 text-neon-cyan border-neon-cyan/40 shadow-[0_0_15px_rgba(34,211,238,0.2)] scale-102"
                     : "text-zinc-400 hover:text-zinc-200 border-white/5 hover:border-white/15"
                     }`}
                 >
@@ -172,27 +124,35 @@ export default function DirectoryPage() {
                 </button>
               ))}
             </div>
+          </div>
 
-            {/* Status Filter */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] text-zinc-500 tracking-wider uppercase font-bold mr-1">
-                Status:
-              </span>
+          {/* Spacer divider for Desktop */}
+          <div className="hidden md:block self-stretch w-[1px] bg-white/5" />
+
+          {/* Group 2: Graduation Milestone Statuses */}
+          <div className="space-y-3 flex-1 md:pl-6">
+            <span className="text-[10px] text-zinc-400 tracking-[0.2em] uppercase font-extrabold font-display block">
+              Graduation Certification Statuses
+            </span>
+            <div className="flex flex-wrap gap-2.5">
               {[
                 { name: "All Statuses", value: "All" },
+                { name: "In Progress", value: "Thesis In Progress" },
                 { name: "Seminar Results", value: "Seminar Completed" },
-                { name: "SemHas", value: "SemHas Completed" },
+                { name: "Defense", value: "Defense Completed" },
                 { name: "Graduated", value: "Graduated" }
               ].map((status) => (
                 <button
                   key={status.value}
                   onClick={() => setActiveStatus(status.value as any)}
-                  className={`px-3.5 py-2 rounded-xl text-[10px] font-bold tracking-wider uppercase transition-all duration-300 border ${activeStatus === status.value
+                  className={`px-4 py-2.5 rounded-xl text-[10px] font-extrabold tracking-widest uppercase transition-all duration-300 border font-display cursor-pointer ${activeStatus === status.value
                     ? status.value === "Graduated"
-                      ? "bg-zinc-800 text-amber-400 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                      ? "bg-zinc-800 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.2)] scale-102"
                       : status.value === "Defense Completed"
-                        ? "bg-zinc-800 text-neon-blue border-neon-blue/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
-                        : "bg-zinc-800 text-neon-purple border-neon-purple/40 shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                        ? "bg-zinc-800 text-neon-blue border-neon-blue/40 shadow-[0_0_15px_rgba(6,182,212,0.2)] scale-102"
+                        : status.value === "Seminar Completed"
+                          ? "bg-zinc-800 text-neon-purple border-neon-purple/40 shadow-[0_0_15px_rgba(168,85,247,0.2)] scale-102"
+                          : "bg-zinc-800 text-neon-cyan border-neon-cyan/40 shadow-[0_0_15px_rgba(34,211,238,0.2)] scale-102"
                     : "text-zinc-400 hover:text-zinc-200 border-white/5 hover:border-white/15"
                     }`}
                 >
@@ -201,15 +161,18 @@ export default function DirectoryPage() {
               ))}
             </div>
           </div>
+
         </div>
       </section>
 
+      {/* 5. GRADUATES REGISTRY GRID */}
       <section className="py-12 px-4 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="student-directory-grid">
           {filteredGraduates.map((grad) => (
-            <div
+            <a
               key={grad.nim}
-              className={`group relative p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[500px] border border-white/5 overflow-hidden ${grad.glowClass}`}
+              href={`/directory/${grad.nim}`}
+              className={`group relative p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[500px] border border-white/5 overflow-hidden cursor-pointer block ${grad.glowClass}`}
             >
               <div>
                 {/* Header with NIM and Status Progress Badge */}
@@ -276,7 +239,7 @@ export default function DirectoryPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </a>
           ))}
 
           {/* Claim Profile Empty State Card */}
@@ -302,57 +265,6 @@ export default function DirectoryPage() {
           </div>
         </div>
       </section>
-
-      {/* 6. GRADUATION SCRATCH CARD PREVIEW */}
-      <section className="relative py-24 px-4 bg-zinc-950/40 border-t border-b border-white/5" id="scratch-preview">
-        <div className="absolute inset-0 bg-gradient-to-b from-void/0 via-neon-purple/5 to-void/0 pointer-events-none -z-10" />
-
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          {/* Details Column */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-1 bg-neon-purple/10 border border-neon-purple/20 px-3 py-1 rounded-full text-neon-purple text-[10px] tracking-widest font-extrabold uppercase font-display">
-              <Sparkles size={11} className="animate-spin-slow" />
-              Interactive Title Reveal
-            </div>
-
-            <h2 className="text-3xl md:text-5xl font-display font-extrabold tracking-tight text-white leading-tight">
-              Scratch to Reveal Your Degree Title.
-            </h2>
-
-            <p className="text-sm text-zinc-400 leading-relaxed font-sans">
-              A digital graduation portal exclusive. Informatics students can scratch away the cryptographic metallic overlay of their yearbook card to officially reveal their degree title under the seal of the department board.
-            </p>
-
-            <ul className="space-y-3.5 text-xs text-zinc-300">
-              <li className="flex items-start gap-2.5">
-                <span className="bg-neon-cyan/20 text-neon-cyan p-1 rounded-full text-[10px] font-bold">✔</span>
-                <span>Reflects approved Seminar Results and Thesis Defense status.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="bg-neon-cyan/20 text-neon-cyan p-1 rounded-full text-[10px] font-bold">✔</span>
-                <span>Unlocks the prestigious "S.Kom." signature and digital graduation card.</span>
-              </li>
-            </ul>
-
-            <div className="p-4 rounded-xl glass-panel bg-void/50 border border-yellow-500/10 flex items-center gap-3">
-              <div className="bg-yellow-500/10 p-2.5 rounded-lg text-yellow-500 border border-yellow-500/20">
-                <Lock size={15} />
-              </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                <strong className="text-zinc-200 block">Status Constraint Alert:</strong>
-                Your title remains securely locked beneath the cryptographic silver barrier until all milestones in your academic checklist are certified.
-              </p>
-            </div>
-          </div>
-
-          {/* Interactive Scratch Card Component */}
-          <div className="lg:col-span-6 flex justify-center">
-            <ScratchCard />
-          </div>
-        </div>
-      </section>
-
-      {/* 7. FOOTER */}
       <Footer />
 
     </div>
