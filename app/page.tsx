@@ -8,8 +8,6 @@ import {
   TrendingUp,
   ChevronRight,
   Sparkles,
-  Heart,
-  UserCheck,
   Calendar,
   Lock,
   ArrowUpRight
@@ -20,9 +18,26 @@ import MemoryGallery from "@/components/MemoryGallery";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+interface Stats {
+  total_students: number;
+  seminar_completed: number;
+  semhas_completed: number;
+  graduated: number;
+}
+
 
 export default function Home() {
   const [activeTimeline, setActiveTimeline] = useState(3); // 2025 as default active
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/statistics")
+      .then((res) => res.json())
+      .then((data: Stats) => setStats(data))
+      .catch((err) => console.error("[Home] Failed to fetch statistics:", err))
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   const milestones = [
     { year: "2022", title: "First Day", desc: "120 eager minds met for the first time in Algorithms 101, initiating our collective digital path.", tag: "Enrolled" },
@@ -113,12 +128,44 @@ export default function Home() {
 
           {/* Card Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6" id="stats-grid">
-            {[
-              { label: "Total Students Enrolled", val: "120", desc: "Cohort Strength", icon: Users, color: "text-neon-cyan" },
-              { label: "Seminar Results Completed", val: "100%", desc: "Research Approved", icon: BookOpen, color: "text-neon-purple" },
-              { label: "Thesis Defense Completed", val: "94 / 120", desc: "Approved Systems", icon: TrendingUp, color: "text-neon-indigo" },
-              { label: "Graduated Students", val: "88", desc: "S.Kom Degrees Issued", icon: Award, color: "text-amber-400" },
-            ].map((stat, idx) => (
+            {([
+              {
+                label: "Total Students Enrolled",
+                val: statsLoading ? null : String(stats?.total_students ?? 0),
+                desc: "Cohort Strength",
+                icon: Users,
+                color: "text-neon-cyan",
+              },
+              {
+                label: "Proposal Seminar(Sempro)",
+                val: statsLoading
+                  ? null
+                  : stats && stats.total_students > 0
+                    ? `${stats.seminar_completed} / ${stats.total_students}`
+                    : "0",
+                desc: "Research Approved",
+                icon: BookOpen,
+                color: "text-neon-purple",
+              },
+              {
+                label: "Seminar Result (Semhas)",
+                val: statsLoading
+                  ? null
+                  : stats && stats.total_students > 0
+                    ? `${stats.semhas_completed} / ${stats.total_students}`
+                    : "0",
+                desc: "Semhas Completed",
+                icon: TrendingUp,
+                color: "text-neon-indigo",
+              },
+              {
+                label: "Graduated Students",
+                val: statsLoading ? null : String(stats?.graduated ?? 0),
+                desc: "S.Kom Degrees Issued",
+                icon: Award,
+                color: "text-amber-400",
+              },
+            ] as const).map((stat, idx) => (
               <div
                 key={idx}
                 className="group relative p-6 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between h-[160px] overflow-hidden"
@@ -134,9 +181,14 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <div className="text-3xl font-display font-extrabold text-white tracking-wide">
-                    {stat.val}
-                  </div>
+                  {stat.val === null ? (
+                    // Loading shimmer
+                    <div className="h-9 w-24 rounded-lg bg-white/5 animate-pulse" />
+                  ) : (
+                    <div className="text-3xl font-display font-extrabold text-white tracking-wide">
+                      {stat.val}
+                    </div>
+                  )}
                   <span className="text-[10px] text-zinc-500 mt-0.5 block">
                     {stat.desc}
                   </span>
