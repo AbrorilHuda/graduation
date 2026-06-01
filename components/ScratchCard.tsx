@@ -237,33 +237,7 @@ export default function ScratchCard({ studentName = "MAHASISWA", isLockedInitial
         </>
       )}
 
-      {/* Control Switch (Only in normal view) */}
-      {!isFullscreen && (
-        <div className="flex bg-zinc-950/80 p-1.5 rounded-full border border-white/5 gap-2 w-fit">
-          <button
-            onClick={() => setIsLocked(false)}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider transition-all duration-300 ${!isLocked
-                ? "bg-gradient-to-r from-neon-purple to-neon-indigo text-white shadow-md shadow-neon-purple/20"
-                : "text-zinc-400 hover:text-zinc-100"
-              }`}
-            id="btn-scratch-card-unlocked"
-          >
-            <Unlock size={13} />
-            UNLOCKED PREVIEW
-          </button>
-          <button
-            onClick={() => setIsLocked(true)}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider transition-all duration-300 ${isLocked
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
-                : "text-zinc-400 hover:text-zinc-100"
-              }`}
-            id="btn-scratch-card-locked"
-          >
-            <Lock size={13} />
-            LOCKED STATE
-          </button>
-        </div>
-      )}
+
 
       {/* Realistic Card Mockup */}
       <div

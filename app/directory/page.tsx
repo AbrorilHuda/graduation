@@ -9,10 +9,10 @@ import {
   Sparkles
 } from "lucide-react";
 import ParticleBackground from "@/components/ParticleBackground";
-import ScratchCard from "@/components/ScratchCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Student, getStoredStudents } from "@/components/db";
+import { Student, fetchAllStudents } from "@/lib/db";
+import Link from "next/link";
 
 export default function DirectoryPage() {
   const [graduates, setGraduates] = useState<Student[]>([]);
@@ -20,10 +20,14 @@ export default function DirectoryPage() {
   const [activeFilter, setActiveFilter] = useState<"All" | "Business Intelligence" | "Smart Agriculture">("All");
   const [activeStatus, setActiveStatus] = useState<"All" | "Seminar Completed" | "Defense Completed" | "Graduated" | "Thesis In Progress">("All");
   const [claimStatus, setClaimStatus] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load graduates dynamically from storage
+  // Load graduates dynamically from Supabase
   useEffect(() => {
-    setGraduates(getStoredStudents());
+    fetchAllStudents().then((data) => {
+      setGraduates(data);
+      setIsLoading(false);
+    });
   }, []);
 
   // Multi-dimensional Filter Directory Logic
@@ -168,79 +172,112 @@ export default function DirectoryPage() {
       {/* 5. GRADUATES REGISTRY GRID */}
       <section className="py-12 px-4 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="student-directory-grid">
-          {filteredGraduates.map((grad) => (
-            <a
-              key={grad.nim}
-              href={`/directory/${grad.nim}`}
-              className={`group relative p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[500px] border border-white/5 overflow-hidden cursor-pointer block ${grad.glowClass}`}
-            >
-              <div>
-                {/* Header with NIM and Status Progress Badge */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-zinc-500 font-semibold">NIM • {grad.nim}</span>
-                  <span className={`text-[8px] font-display font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border ${grad.badgeClass}`}>
-                    {grad.status}
-                  </span>
+          {isLoading
+            ? // Loading skeleton cards
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="relative p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[500px] border border-white/5 overflow-hidden animate-pulse">
+                <div className="flex justify-between">
+                  <div className="h-3 w-24 bg-zinc-800 rounded" />
+                  <div className="h-3 w-20 bg-zinc-800 rounded" />
                 </div>
-
-                {/* Profile Photo with image zoom and layout */}
-                <div className="my-6 relative aspect-[4/3] rounded-xl overflow-hidden border border-white/5 bg-void/50">
-                  <img
-                    src={grad.image}
-                    alt={grad.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent opacity-85" />
-                  <span className="absolute bottom-3 left-3 bg-zinc-950/90 text-zinc-300 text-[8px] font-bold tracking-widest uppercase border border-white/10 px-2 py-0.5 rounded-md">
-                    {grad.specialization}
-                  </span>
+                <div className="my-6 aspect-[4/3] rounded-xl bg-zinc-800/60" />
+                <div className="space-y-2">
+                  <div className="h-4 w-3/4 bg-zinc-800 rounded" />
+                  <div className="h-3 w-full bg-zinc-800 rounded" />
+                  <div className="h-3 w-4/5 bg-zinc-800 rounded" />
                 </div>
-
-                {/* Full Name & Title */}
-                <h3 className="text-lg font-bold font-display text-white tracking-wide group-hover:text-neon-cyan transition-colors">
-                  {grad.name}, {grad.status === "Graduated" ? grad.title : "S.Kom. (Cand.)"}
-                </h3>
-
-                {/* Quote */}
-                <p className="text-xs text-zinc-400 mt-3.5 leading-relaxed italic border-l-2 border-neon-purple/30 pl-3">
-                  "{grad.quote}"
-                </p>
-              </div>
-
-              {/* Progress Checklist / Milestones */}
-              <div className="mt-6 pt-5 border-t border-white/5">
-                <span className="text-[8px] tracking-[0.25em] text-zinc-500 font-bold uppercase font-display block mb-3">
-                  GRADUATION PROGRESS
-                </span>
-                <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-semibold">
-                  <div className="flex flex-col items-center">
-                    <span className="text-neon-cyan bg-neon-cyan/5 border border-neon-cyan/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">✔</span>
-                    <span className="text-[9px] text-zinc-400">Proposal</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-neon-purple bg-neon-purple/5 border border-neon-purple/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">✔</span>
-                    <span className="text-[9px] text-zinc-400">SemPro</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    {grad.milestones.defense ? (
-                      <span className="text-neon-blue bg-neon-blue/5 border border-neon-blue/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">✔</span>
-                    ) : (
-                      <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 animate-pulse">⏳</span>
-                    )}
-                    <span className="text-[9px] text-zinc-400">SemHas</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    {grad.milestones.graduation ? (
-                      <span className="text-amber-400 bg-amber-500/5 border border-amber-500/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 shadow-md shadow-amber-500/10">✔</span>
-                    ) : (
-                      <span className="text-zinc-600 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">🔒</span>
-                    )}
-                    <span className="text-[9px] text-zinc-400">Graduated</span>
-                  </div>
+                <div className="mt-6 pt-5 border-t border-white/5 grid grid-cols-4 gap-2">
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <div key={j} className="flex flex-col items-center gap-1">
+                      <div className="w-6 h-6 rounded-full bg-zinc-800" />
+                      <div className="h-2 w-8 bg-zinc-800 rounded" />
+                    </div>
+                  ))}
                 </div>
               </div>
-            </a>
-          ))}
+            ))
+            : filteredGraduates.map((grad) => (
+              <a
+                key={grad.id || grad.nim}
+                href={`/directory/${grad.id}`}
+                className={`group relative p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[500px] border border-white/5 overflow-hidden cursor-pointer block ${grad.glowClass}`}
+              >
+                <div>
+                  {/* Header with NIM and Status Progress Badge */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-zinc-500 font-semibold">NIM • {grad.nim}</span>
+                    <span className={`text-[8px] font-display font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border ${grad.badgeClass}`}>
+                      {grad.status}
+                    </span>
+                  </div>
+
+                  {/* Profile Photo with image zoom and layout */}
+                  <div className="my-6 relative aspect-[4/3] rounded-xl overflow-hidden border border-white/5 bg-void/50">
+                    <img
+                      src={grad.image}
+                      alt={grad.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent opacity-85" />
+                    <span className="absolute bottom-3 left-3 bg-zinc-950/90 text-zinc-300 text-[8px] font-bold tracking-widest uppercase border border-white/10 px-2 py-0.5 rounded-md">
+                      {grad.specialization}
+                    </span>
+                  </div>
+
+                  {/* Full Name & Title */}
+                  <h3 className="text-lg font-bold font-display text-white tracking-wide group-hover:text-neon-cyan transition-colors">
+                    {grad.name}{grad.title ? `, ${grad.title}` : ""}
+                  </h3>
+
+                  {/* Quote */}
+                  <p className="text-xs text-zinc-400 mt-3.5 leading-relaxed italic border-l-2 border-neon-purple/30 pl-3">
+                    "{grad.quote}"
+                  </p>
+                </div>
+
+                {/* Progress Checklist / Milestones */}
+                <div className="mt-6 pt-5 border-t border-white/5">
+                  <span className="text-[8px] tracking-[0.25em] text-zinc-500 font-bold uppercase font-display block mb-3">
+                    GRADUATION PROGRESS
+                  </span>
+                  <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-semibold">
+                    <div className="flex flex-col items-center">
+                      {grad.milestones.proposal ? (
+                        <span className="text-neon-cyan bg-neon-cyan/5 border border-neon-cyan/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 shadow-sm shadow-neon-cyan/5">✔</span>
+                      ) : (
+                        <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 animate-pulse">⏳</span>
+                      )}
+                      <span className="text-[9px] text-zinc-400">Proposal</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      {grad.milestones.seminar ? (
+                        <span className="text-neon-purple bg-neon-purple/5 border border-neon-purple/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 shadow-sm shadow-neon-purple/5">✔</span>
+                      ) : (
+                        <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 animate-pulse">⏳</span>
+                      )}
+                      <span className="text-[9px] text-zinc-400">SemPro</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      {grad.milestones.defense ? (
+                        <span className="text-neon-blue bg-neon-blue/5 border border-neon-blue/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">✔</span>
+                      ) : (
+                        <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 animate-pulse">⏳</span>
+                      )}
+                      <span className="text-[9px] text-zinc-400">SemHas</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      {grad.milestones.graduation ? (
+                        <span className="text-amber-400 bg-amber-500/5 border border-amber-500/20 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 shadow-md shadow-amber-500/10">✔</span>
+                      ) : (
+                        <span className="text-zinc-600 bg-zinc-950 border border-white/5 w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1">🔒</span>
+                      )}
+                      <span className="text-[9px] text-zinc-400">Graduated</span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))
+          }
 
           {/* Claim Profile Empty State Card */}
           <div
@@ -259,7 +296,7 @@ export default function DirectoryPage() {
             </p>
             {claimStatus && (
               <div className="mt-6 px-4 py-2 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-[10px] font-bold tracking-wider animate-pulse">
-                REGISTRATION OPEN VIA IT PORTAL
+                <Link href="/register">REGISTRATION OPEN VIA IT PORTAL</Link>
               </div>
             )}
           </div>

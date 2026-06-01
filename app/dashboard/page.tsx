@@ -1,44 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Sparkles, 
-  Lock, 
-  Unlock, 
-  LogOut, 
-  CheckCircle, 
-  Settings, 
-  Shield, 
-  User, 
-  Camera, 
-  BookOpen, 
+import {
+  Sparkles,
+  Lock,
+  Unlock,
+  LogOut,
+  CheckCircle,
+  Settings,
+  Shield,
+  User,
+  Camera,
+  BookOpen,
   Award,
   ChevronRight,
   RefreshCw,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ParticleBackground from "@/components/ParticleBackground";
-import { 
-  Student, 
-  getStoredStudents, 
-  saveStoredStudents, 
-  getStoredUser, 
-  loginUser, 
+import {
+  Student,
+  getStoredUser,
+  setStoredUser,
   logoutUser,
-  computeStudentStatus
-} from "@/components/db";
+  computeStudentStatus,
+  fetchAllStudents,
+  updateStudentProfile,
+  updateMilestone,
+} from "@/lib/db";
 
 // Cool 3D glowing virtual avatars that students can choose from as presets
 const AVATAR_PRESETS = [
   { name: "Cyan Sparkle", url: "/images/student_2.png" },
-  { name: "Purple Star", url: "/images/student_3.png" },
-  { name: "Gold Diploma", url: "/images/student_1.png" },
-  { name: "Emerald Tech", url: "/images/student_4.png" },
-  { name: "Cyber Neon", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=60" },
-  { name: "Astro Glass", url: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=150&auto=format&fit=crop&q=60" }
 ];
 
 export default function DashboardPage() {
@@ -46,6 +43,8 @@ export default function DashboardPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const [activeTab, setActiveTab] = useState<"profile" | "admin">("profile");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Edit fields for active student
   const [editName, setEditName] = useState("");
@@ -54,35 +53,15 @@ export default function DashboardPage() {
   const [editImage, setEditImage] = useState("");
   const [customImageUrl, setCustomImageUrl] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState("");
-
-  // Load students & active user session
-  useEffect(() => {
-    const loadedStudents = getStoredStudents();
-    setStudents(loadedStudents);
-    const active = getStoredUser();
-    if (active) {
-      // Find latest state of current user in stored database
-      const latest = loadedStudents.find((s) => s.nim === active.nim);
-      if (latest) {
-        setCurrentUser(latest);
-        initForm(latest);
-        if (latest.role === "admin") {
-          setActiveTab("admin");
-        } else {
-          setActiveTab("profile");
-        }
-      }
-    } else {
-      router.push("/login");
-    }
-  }, [router]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const initForm = (user: Student) => {
     setEditName(user.name);
     setEditQuote(user.quote);
     setEditSpecialization(user.specialization);
     setEditImage(user.image);
-    // If image is custom and not in presets, load it into custom URL input
     const isPreset = AVATAR_PRESETS.some((preset) => preset.url === user.image);
     if (!isPreset && user.image.startsWith("http")) {
       setCustomImageUrl(user.image);
@@ -91,88 +70,180 @@ export default function DashboardPage() {
     }
   };
 
+  // Load students & active user session
+  const loadData = useCallback(async () => {
+    const active = getStoredUser();
+    if (!active) {
+      router.push("/login");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const loadedStudents = await fetchAllStudents();
+      setStudents(loadedStudents);
+
+      // Refresh current user data dari Supabase
+      const latest = loadedStudents.find((s) => s.nim === active.nim);
+      if (latest) {
+        setCurrentUser(latest);
+        setStoredUser(latest);
+        initForm(latest);
+        if (latest.role === "admin") {
+          setActiveTab("admin");
+        } else {
+          setActiveTab("profile");
+        }
+      } else {
+        // Student dihapus atau tidak ditemukan
+        setCurrentUser(active);
+        initForm(active);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   // Handle Secure Logout
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
+    router.push("/login");
   };
 
   // Handle Saving Profile Info
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
     const imgToSave = customImageUrl ? customImageUrl : editImage;
 
-    const updatedStudents = students.map((s) => {
-      if (s.nim === currentUser.nim) {
-        return {
-          ...s,
-          name: editName,
-          quote: editQuote,
-          specialization: editSpecialization,
-          image: imgToSave
-        };
+    setIsSaving(true);
+    try {
+      const { success, error } = await updateStudentProfile(currentUser.nim, {
+        name: editName,
+        quote: editQuote,
+        specialization: editSpecialization,
+        avatar_url: imgToSave,
+      });
+
+      if (!success) {
+        setFeedbackMsg(`Gagal menyimpan: ${error}`);
+        setTimeout(() => setFeedbackMsg(""), 3000);
+        return;
       }
-      return s;
-    });
 
-    saveStoredStudents(updatedStudents);
-    setStudents(updatedStudents);
-
-    // Sync active session user
-    const updatedSelf = updatedStudents.find((s) => s.nim === currentUser.nim) || null;
-    if (updatedSelf) {
-      setCurrentUser(updatedSelf);
-      localStorage.setItem("active_user", JSON.stringify(updatedSelf));
+      // Refresh data dari server
+      await loadData();
+      setFeedbackMsg("Profile personalized successfully!");
+      setTimeout(() => setFeedbackMsg(""), 3000);
+    } finally {
+      setIsSaving(false);
     }
+  };
 
-    setFeedbackMsg("Profile personalized successfully!");
-    setTimeout(() => setFeedbackMsg(""), 3000);
+  // Handle Avatar File Upload → Supabase Storage
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    setUploadError("");
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("student_nim", currentUser.nim);
+      // Kirim URL lama agar server bisa menghapusnya dari bucket
+      const oldUrl = currentUser.image;
+      if (oldUrl && oldUrl.startsWith("http") && oldUrl.includes("/avatars/")) {
+        fd.append("old_path", oldUrl);
+      }
+
+      const res = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setUploadError(data.error ?? "Gagal mengupload foto.");
+        return;
+      }
+
+      // Update state langsung — user bisa langsung melihat preview baru
+      setEditImage(data.url);
+      setCustomImageUrl("");
+    } catch (err: any) {
+      setUploadError("Koneksi gagal saat mengupload foto.");
+    } finally {
+      setIsUploading(false);
+      // Reset file input agar pengguna bisa upload file yang sama lagi
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   // Admin Toggle Checklist Milestone Action
-  const handleToggleMilestone = (nim: string, milestoneKey: keyof Student["milestones"]) => {
-    const updatedStudents = students.map((s) => {
+  const handleToggleMilestone = async (nim: string, milestoneKey: keyof Student["milestones"]) => {
+    if (!currentUser) return;
+
+    // Optimistic update — langsung update UI, lalu sync ke server
+    const targetStudent = students.find((s) => s.nim === nim);
+    if (!targetStudent) return;
+
+    const newValue = !targetStudent.milestones[milestoneKey];
+    const nextMilestones = { ...targetStudent.milestones, [milestoneKey]: newValue };
+    const computed = computeStudentStatus(nextMilestones);
+
+    const optimisticStudents = students.map((s) => {
       if (s.nim === nim) {
-        const nextMilestones = {
-          ...s.milestones,
-          [milestoneKey]: !s.milestones[milestoneKey]
-        };
-        // Recompute statuses, tags, badges, and colors
-        const computed = computeStudentStatus(nextMilestones);
-        return {
-          ...s,
-          milestones: nextMilestones,
-          ...computed
-        };
+        return { ...s, milestones: nextMilestones, ...computed };
       }
       return s;
     });
+    setStudents(optimisticStudents);
 
-    saveStoredStudents(updatedStudents);
-    setStudents(updatedStudents);
+    // Sync ke server
+    const { success, error } = await updateMilestone(
+      currentUser.nim,
+      nim,
+      milestoneKey,
+      newValue
+    );
 
-    // If the admin toggles their own milestone, update active session details too
-    if (currentUser && nim === currentUser.nim) {
-      const updatedSelf = updatedStudents.find((s) => s.nim === currentUser.nim) || null;
+    if (!success) {
+      console.error("[Dashboard] Toggle milestone failed:", error);
+      // Revert jika gagal
+      await loadData();
+    } else if (currentUser.nim === nim) {
+      // Update session jika admin toggle miliknya sendiri
+      const updatedSelf = optimisticStudents.find((s) => s.nim === nim);
       if (updatedSelf) {
         setCurrentUser(updatedSelf);
-        localStorage.setItem("active_user", JSON.stringify(updatedSelf));
+        setStoredUser(updatedSelf);
       }
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-void font-sans items-center justify-center">
+        <Loader2 size={32} className="text-neon-purple animate-spin mb-3" />
+        <p className="text-xs text-zinc-500 tracking-widest uppercase">Memuat data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-void font-sans select-none overflow-x-hidden text-zinc-100">
-      
+
       {/* STICKY NAVBAR */}
       <Navbar />
 
       {/* DYNAMIC HEADER */}
       <header className="relative min-h-[35vh] flex items-center justify-center pt-32 pb-12 px-4 overflow-hidden cyber-grid border-b border-white/5">
         <ParticleBackground />
-        
+
         {/* Glow Spheres */}
         <div className="absolute top-1/4 left-1/3 w-[30vw] h-[30vw] max-w-[300px] rounded-full bg-neon-purple/10 blur-[90px] -z-10 animate-float-slow" />
         <div className="absolute bottom-1/4 right-1/4 w-[25vw] h-[25vw] max-w-[250px] rounded-full bg-neon-blue/10 blur-[80px] -z-10 animate-float-medium" />
@@ -190,7 +261,7 @@ export default function DashboardPage() {
           </h1>
 
           <p className="text-xs sm:text-sm text-zinc-400 mt-3 max-w-lg leading-relaxed font-sans">
-            {currentUser 
+            {currentUser
               ? `Logged in as ${currentUser.name} • Customize graduation certificates and showcase details.`
               : "Authenticating session status..."}
           </p>
@@ -199,7 +270,7 @@ export default function DashboardPage() {
 
       {/* DASHBOARD WORKSPACE CONTAINER */}
       <main className="flex-grow py-12 px-4 max-w-7xl mx-auto w-full z-20">
-        
+
         {currentUser && (
           /* SECURE LOGGED-IN PORTAL WORKSPACE */
           <div className="space-y-8 animate-fade-in">
@@ -238,22 +309,20 @@ export default function DashboardPage() {
                   <div className="flex bg-zinc-950/80 p-1.5 rounded-full border border-white/5 gap-1.5 w-fit self-center">
                     <button
                       onClick={() => setActiveTab("admin")}
-                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-300 ${
-                        activeTab === "admin"
-                          ? "bg-zinc-800 text-amber-400 border border-amber-500/30"
-                          : "text-zinc-400 hover:text-zinc-100"
-                      }`}
+                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-300 ${activeTab === "admin"
+                        ? "bg-zinc-800 text-amber-400 border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-100"
+                        }`}
                     >
                       <Shield size={10} />
                       ADMIN WORKSPACE
                     </button>
                     <button
                       onClick={() => setActiveTab("profile")}
-                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-300 ${
-                        activeTab === "profile"
-                          ? "bg-zinc-800 text-neon-cyan border-neon-cyan/30"
-                          : "text-zinc-400 hover:text-zinc-100"
-                      }`}
+                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-300 ${activeTab === "profile"
+                        ? "bg-zinc-800 text-neon-cyan border-neon-cyan/30"
+                        : "text-zinc-400 hover:text-zinc-100"
+                        }`}
                     >
                       <Settings size={10} />
                       EDIT MY PROFILE
@@ -273,7 +342,7 @@ export default function DashboardPage() {
 
             {/* TAB CONTAINER WORKSPACE */}
             <div className="transition-all duration-500">
-              
+
               {/* TAB 1: COHORT ADMINISTRATION (ADMIN ONLY) */}
               {currentUser.role === "admin" && activeTab === "admin" && (
                 <div className="space-y-6">
@@ -390,7 +459,7 @@ export default function DashboardPage() {
               {/* TAB 2: PROFILE SETTINGS */}
               {(currentUser.role !== "admin" || activeTab === "profile") && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
+
                   {/* Left Column Form customizer */}
                   <form onSubmit={handleSaveProfile} className="lg:col-span-8 glass-panel border border-white/10 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
                     <h2 className="text-xl font-bold font-display text-white tracking-wide flex items-center gap-2">
@@ -415,13 +484,19 @@ export default function DashboardPage() {
 
                       {/* Specialization select */}
                       <div className="space-y-2">
-                        <label className="text-[10px] tracking-wider text-zinc-400 uppercase font-bold">
-                          Specialization Track
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] tracking-wider text-zinc-400 uppercase font-bold">
+                            Specialization Track
+                          </label>
+                          <span className="inline-flex items-center gap-1 text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded uppercase font-bold font-display">
+                            🔒 Locked
+                          </span>
+                        </div>
                         <select
                           value={editSpecialization}
                           onChange={(e) => setEditSpecialization(e.target.value as any)}
-                          className="w-full bg-zinc-950/80 text-xs text-zinc-200 px-4 py-3 rounded-xl border border-white/5 focus:border-neon-cyan/40 focus:outline-none transition-all"
+                          disabled
+                          className="w-full bg-zinc-950/80 text-xs text-zinc-200 px-4 py-3 rounded-xl border border-white/5 focus:border-neon-cyan/40 focus:outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <option value="Business Intelligence">Business Intelligence</option>
                           <option value="Smart Agriculture">Smart Agriculture</option>
@@ -451,37 +526,115 @@ export default function DashboardPage() {
                           Profile Portrait Image Customization
                         </label>
                         <p className="text-[10px] text-zinc-500 font-sans mt-0.5">
-                          Select one of our premium digital avatar presets or input a custom image URL.
+                          Upload foto langsung ke cloud, pilih preset, atau masukkan URL gambar.
                         </p>
                       </div>
 
+                      {/* Upload dari perangkat */}
+                      <div className="space-y-2">
+                        <label className="text-[9px] tracking-wider text-zinc-500 uppercase font-bold block">
+                          Upload Foto Profil (JPG · PNG · WebP · maks 5 MB)
+                        </label>
+
+                        {/* Hidden file input */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          id="avatar-file-input"
+                          onChange={handleAvatarUpload}
+                        />
+
+                        <div className="flex items-center gap-3">
+                          {/* Current preview thumbnail */}
+                          <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                            {(editImage || currentUser?.image) ? (
+                              <img
+                                src={editImage || currentUser?.image}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                                <User size={20} className="text-zinc-600" />
+                              </div>
+                            )}
+                            {isUploading && (
+                              <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                                <Loader2 size={16} className="animate-spin text-neon-cyan" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Upload button */}
+                          <label
+                            htmlFor="avatar-file-input"
+                            className={`cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold tracking-wider uppercase transition-all
+                              ${isUploading
+                                ? "border-zinc-700 text-zinc-500 cursor-not-allowed"
+                                : "border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10 hover:border-neon-cyan/60"
+                              }`}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Mengupload...
+                              </>
+                            ) : (
+                              <>
+                                <Camera size={12} />
+                                Pilih Foto
+                              </>
+                            )}
+                          </label>
+
+                          {/* Success indicator */}
+                          {editImage && editImage.includes("/storage/v1/object/public/avatars/") && !isUploading && (
+                            <span className="flex items-center gap-1 text-[10px] text-green-400 font-bold">
+                              <CheckCircle size={11} />
+                              Tersimpan di cloud
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Error message */}
+                        {uploadError && (
+                          <p className="text-[10px] text-red-400 font-mono mt-1">{uploadError}</p>
+                        )}
+                      </div>
+
                       {/* Presets Grid */}
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                        {AVATAR_PRESETS.map((preset) => (
-                          <div
-                            key={preset.name}
-                            onClick={() => {
-                              setEditImage(preset.url);
-                              setCustomImageUrl("");
-                            }}
-                            className={`group relative aspect-square rounded-xl overflow-hidden border cursor-pointer shrink-0 transition-all ${
-                              editImage === preset.url && !customImageUrl
+                      <div className="space-y-2">
+                        <label className="text-[9px] tracking-wider text-zinc-500 uppercase font-bold block">
+                          Atau pilih avatar preset
+                        </label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                          {AVATAR_PRESETS.map((preset) => (
+                            <div
+                              key={preset.name}
+                              onClick={() => {
+                                setEditImage(preset.url);
+                                setCustomImageUrl("");
+                              }}
+                              className={`group relative aspect-square rounded-xl overflow-hidden border cursor-pointer shrink-0 transition-all ${editImage === preset.url && !customImageUrl
                                 ? "border-neon-cyan shadow-md shadow-neon-cyan/15 scale-105"
                                 : "border-white/5 hover:border-white/20 hover:scale-102"
-                            }`}
-                          >
-                            <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="text-[8px] text-white font-bold tracking-widest uppercase">SELECT</span>
+                                }`}
+                            >
+                              <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[8px] text-white font-bold tracking-widest uppercase">SELECT</span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
 
                       {/* Custom image URL input */}
                       <div className="space-y-2">
                         <label className="text-[9px] tracking-wider text-zinc-500 uppercase font-bold block">
-                          OR: Provide Custom Profile Image URL from internet
+                          Atau masukkan URL gambar dari internet
                         </label>
                         <input
                           type="url"
@@ -506,12 +659,20 @@ export default function DashboardPage() {
                           </span>
                         )}
                       </div>
-                      
+
                       <button
                         type="submit"
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-blue hover:from-neon-cyan hover:to-neon-purple text-xs font-extrabold tracking-widest text-white shadow-lg shadow-neon-cyan/25 transition-all font-display uppercase"
+                        disabled={isSaving}
+                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-blue hover:from-neon-cyan hover:to-neon-purple text-xs font-extrabold tracking-widest text-white shadow-lg shadow-neon-cyan/25 transition-all font-display uppercase disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 justify-center"
                       >
-                        SAVE PROFILE DETAILS
+                        {isSaving ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            SAVING...
+                          </>
+                        ) : (
+                          "SAVE PROFILE DETAILS"
+                        )}
                       </button>
                     </div>
                   </form>
@@ -522,9 +683,8 @@ export default function DashboardPage() {
                       REAL-TIME DIRECTORY PREVIEW
                     </span>
 
-                    <div className={`p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[460px] border border-white/5 overflow-hidden transition-all duration-500 shadow-2xl relative ${
-                      currentUser.glowClass
-                    }`}>
+                    <div className={`p-6 rounded-2xl glass-panel flex flex-col justify-between min-h-[460px] border border-white/5 overflow-hidden transition-all duration-500 shadow-2xl relative ${currentUser.glowClass
+                      }`}>
                       <div>
                         {/* Header with NIM and Status Progress Badge */}
                         <div className="flex items-center justify-between">
@@ -551,7 +711,7 @@ export default function DashboardPage() {
                         <h3 className="text-lg font-bold font-display text-white tracking-wide">
                           {editName}, {currentUser.status === "Graduated" ? currentUser.title : "S.Kom. (Cand.)"}
                         </h3>
-                        
+
                         {/* Quote */}
                         <p className="text-xs text-zinc-400 mt-3.5 leading-relaxed italic border-l-2 border-neon-purple/30 pl-3 max-h-[80px] overflow-hidden text-ellipsis">
                           "{editQuote}"

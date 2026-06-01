@@ -6,7 +6,7 @@ import ParticleBackground from "@/components/ParticleBackground";
 import ScratchCard from "@/components/ScratchCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Student, getStoredStudents } from "@/components/db";
+import { Student, fetchStudentById } from "@/lib/db";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -18,12 +18,17 @@ export default function StudentDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const list = getStoredStudents();
-    const found = list.find((g) => g.nim === id);
-    if (found) {
-      setStudent(found);
+    async function load() {
+      try {
+        const found = await fetchStudentById(id);
+        if (found) setStudent(found);
+      } catch (err) {
+        console.error("[directory/[id]] load error:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-    setLoading(false);
+    load();
   }, [id]);
 
   if (loading) {
@@ -65,14 +70,14 @@ export default function StudentDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-void font-sans select-none overflow-x-hidden text-zinc-100">
-      
+
       {/* 1. NAVBAR */}
       <Navbar />
 
       {/* 2. DYNAMIC STARDUST PORTRAIT BANNER */}
       <header className="relative min-h-[40vh] flex items-center justify-center pt-32 pb-12 px-4 overflow-hidden cyber-grid">
         <ParticleBackground />
-        
+
         {/* Glow Spheres */}
         <div className="absolute top-1/4 left-1/3 w-[35vw] h-[35vw] max-w-[350px] rounded-full bg-neon-purple/10 blur-[100px] -z-10 animate-float-slow" />
         <div className="absolute bottom-1/4 right-1/4 w-[30vw] h-[30vw] max-w-[300px] rounded-full bg-neon-blue/10 blur-[80px] -z-10 animate-float-medium" />
@@ -98,7 +103,7 @@ export default function StudentDetailPage({ params }: PageProps) {
       {/* 3. DETAILS & SCRATCH SECTION */}
       <main className="flex-grow py-12 px-4 max-w-6xl mx-auto w-full z-20">
         <div className="relative rounded-3xl overflow-hidden glass-panel border border-white/10 flex flex-col lg:flex-row shadow-2xl">
-          
+
           {/* Back Action */}
           <a
             href="/directory"
@@ -125,7 +130,7 @@ export default function StudentDetailPage({ params }: PageProps) {
                     {student.status}
                   </span>
                   <h2 className="text-xl md:text-2xl font-bold font-display text-white mt-2 leading-tight">
-                    {student.name}, {isGraduated ? student.title : "S.Kom. (Cand.)"}
+                    {student.name}{student.title ? `, ${student.title}` : ""}
                   </h2>
                 </div>
               </div>
@@ -135,20 +140,31 @@ export default function StudentDetailPage({ params }: PageProps) {
                 "{student.quote}"
               </div>
 
-              {/* Progress Milestones */}
+              {/* Progress Milestones — semua 4 milestone dinamis dari Supabase */}
               <div className="space-y-4">
                 <span className="text-[9px] tracking-widest text-zinc-500 font-bold uppercase font-display block">
                   ACADEMIC PROGRESS CHECKLIST
                 </span>
                 <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-semibold">
+                  {/* Proposal */}
                   <div className="flex flex-col items-center">
-                    <span className="text-neon-cyan bg-neon-cyan/5 border border-neon-cyan/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-sm shadow-neon-cyan/5">✔</span>
+                    {student.milestones.proposal ? (
+                      <span className="text-neon-cyan bg-neon-cyan/5 border border-neon-cyan/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-sm shadow-neon-cyan/5">✔</span>
+                    ) : (
+                      <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 animate-pulse">⏳</span>
+                    )}
                     <span className="text-[9px] text-zinc-400">Proposal</span>
                   </div>
+                  {/* SemPro */}
                   <div className="flex flex-col items-center">
-                    <span className="text-neon-purple bg-neon-purple/5 border border-neon-purple/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-sm shadow-neon-purple/5">✔</span>
+                    {student.milestones.seminar ? (
+                      <span className="text-neon-purple bg-neon-purple/5 border border-neon-purple/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-sm shadow-neon-purple/5">✔</span>
+                    ) : (
+                      <span className="text-zinc-500 bg-zinc-950 border border-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 animate-pulse">⏳</span>
+                    )}
                     <span className="text-[9px] text-zinc-400">SemPro</span>
                   </div>
+                  {/* SemHas */}
                   <div className="flex flex-col items-center">
                     {student.milestones.defense ? (
                       <span className="text-neon-blue bg-neon-blue/5 border border-neon-blue/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-sm shadow-neon-blue/5">✔</span>
@@ -157,6 +173,7 @@ export default function StudentDetailPage({ params }: PageProps) {
                     )}
                     <span className="text-[9px] text-zinc-400">SemHas</span>
                   </div>
+                  {/* Graduated */}
                   <div className="flex flex-col items-center">
                     {student.milestones.graduation ? (
                       <span className="text-amber-400 bg-amber-500/5 border border-amber-500/20 w-7 h-7 rounded-full flex items-center justify-center text-xs mb-1.5 shadow-md shadow-amber-500/10">✔</span>
@@ -179,16 +196,16 @@ export default function StudentDetailPage({ params }: PageProps) {
             <span className="text-[9px] tracking-widest text-zinc-500 font-bold uppercase block text-center font-display mb-1">
               DEGREE TITLE REVEAL CARD
             </span>
-            
-            <ScratchCard 
-              studentName={student.name} 
-              isLockedInitially={!isGraduated} 
+
+            <ScratchCard
+              studentName={student.name}
+              isLockedInitially={!student.milestones.defense}
             />
-            
+
             <p className="text-[10px] text-zinc-400 text-center max-w-[280px] leading-relaxed">
-              {isGraduated 
+              {student.milestones.defense
                 ? "Friction-scratch the silver holographic surface above to officially claim and reveal your Bachelor S.Kom designation!"
-                : "This card is cryptographically locked. S.Kom degree overlays require complete SemHas & convocation certification."}
+                : "This card is cryptographically locked. S.Kom degree overlays require complete SemHas certification."}
             </p>
           </div>
 

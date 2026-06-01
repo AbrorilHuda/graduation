@@ -16,7 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import ParticleBackground from "@/components/ParticleBackground";
-import { registerUser } from "@/components/db";
+import { registerUser } from "@/lib/db";
 
 const SPECIALIZATIONS = [
   {
@@ -60,11 +60,13 @@ export default function RegisterPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isCheckingNim, setIsCheckingNim] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   // ── Validation per step ──
   const validateStep1 = () => {
-    if (!nim.trim() || nim.trim().length < 6)
-      return "NIM harus minimal 6 digit.";
+    if (!nim.trim() || nim.trim().length !== 10)
+      return "NIM harus tepat 10 digit.";
     if (!name.trim() || name.trim().length < 3)
       return "Nama lengkap minimal 3 karakter.";
     return null;
@@ -79,6 +81,56 @@ export default function RegisterPage() {
     if (password.length < 6) return "Password minimal 6 karakter.";
     if (password !== confirmPassword) return "Password tidak cocok.";
     return null;
+  };
+
+  const checkNim = async (currentNim: string) => {
+    if (currentNim.length !== 10) return;
+    if (!currentNim.startsWith("2022")) {
+      setErrorMsg("Pendaftaran ini dikhususkan untuk angkatan 2022.");
+      return;
+    }
+    setIsCheckingNim(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`/api/mahasiswa?nim=${currentNim}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        setErrorMsg(errData.error || "Data mahasiswa tidak ditemukan di sistem UNIRA.");
+        setName("");
+        setSpecialization("");
+        setAvatarUrl("");
+        return;
+      }
+      const data = await response.json();
+      setName(data.nama || "");
+      setAvatarUrl(data.image || "");
+      if (data.peminatan === 58) {
+        setSpecialization("Business Intelligence");
+      } else if (data.peminatan === 59) {
+        setSpecialization("Smart Agriculture");
+      } else {
+        setSpecialization("");
+      }
+    } catch (err) {
+      console.error("[checkNim] error:", err);
+      setErrorMsg("Gagal menghubungi server akademik UNIRA.");
+    } finally {
+      setIsCheckingNim(false);
+    }
+  };
+
+  const handleNimChange = (value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, ""); // Hanya angka
+    setNim(cleaned);
+    setErrorMsg("");
+
+    if (cleaned.length < 10) {
+      setName("");
+      setSpecialization("");
+      setAvatarUrl("");
+    } else if (cleaned.length === 10) {
+      checkNim(cleaned);
+    }
   };
 
   const goNext = () => {
@@ -98,13 +150,14 @@ export default function RegisterPage() {
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 800));
 
-    const result = registerUser({
+    const result = await registerUser({
       nim: nim.trim(),
       name: name.trim(),
       password,
       specialization: specialization as
         | "Business Intelligence"
         | "Smart Agriculture",
+      avatar_url: avatarUrl || undefined,
     });
 
     if (result.success) {
@@ -257,29 +310,56 @@ export default function RegisterPage() {
                 <label className="text-[11px] tracking-[0.15em] text-zinc-400 font-bold uppercase">
                   Nomor Induk Mahasiswa (NIM)
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: 220101099"
-                  value={nim}
-                  onChange={(e) => setNim(e.target.value)}
-                  className="w-full bg-white/[0.04] text-sm text-white pl-4 pr-4 py-3.5 rounded-2xl border border-white/8 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all font-mono placeholder:text-zinc-600 hover:border-white/15"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    maxLength={10}
+                    placeholder="Contoh: 2022520045"
+                    value={nim}
+                    onChange={(e) => handleNimChange(e.target.value)}
+                    disabled={isCheckingNim}
+                    className="w-full bg-white/[0.04] text-sm text-white pl-4 pr-12 py-3.5 rounded-2xl border border-white/8 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all font-mono placeholder:text-zinc-600 hover:border-white/15 disabled:opacity-60"
+                  />
+                  {isCheckingNim && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] tracking-[0.15em] text-zinc-400 font-bold uppercase">
+                <label className="text-[11px] tracking-[0.15em] text-zinc-400 font-bold uppercase font-display">
                   Nama Lengkap
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Nama sesuai KTP / dokumen akademik"
+                  placeholder="Diisi otomatis setelah memasukkan NIM..."
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-white/[0.04] text-sm text-white pl-4 pr-4 py-3.5 rounded-2xl border border-white/8 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all placeholder:text-zinc-600 hover:border-white/15"
+                  readOnly={!!avatarUrl}
+                  className="w-full bg-white/[0.04] text-sm text-white pl-4 pr-4 py-3.5 rounded-2xl border border-white/8 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all placeholder:text-zinc-600 hover:border-white/15 read-only:opacity-75 read-only:cursor-not-allowed read-only:border-cyan-500/20"
                 />
               </div>
+
+              {avatarUrl && (
+                <div className="flex items-center gap-4 bg-zinc-950/80 border border-cyan-500/20 p-4 rounded-2xl animate-fade-in relative overflow-hidden shadow-lg">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl pointer-events-none" />
+                  <div className="w-14 h-14 rounded-full overflow-hidden border border-white/10 shrink-0 bg-void/50 shadow-md">
+                    <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="inline-flex items-center gap-1 text-[8px] tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2.5 py-0.5 rounded-full font-extrabold uppercase font-display">
+                      <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse" />
+                      DATA AKADEMIK UNIRA
+                    </span>
+                    <h4 className="text-sm font-bold text-white tracking-wide">{name}</h4>
+                    <p className="text-[10px] text-zinc-500 font-mono">Angkatan 2022 • NIM {nim}</p>
+                  </div>
+                </div>
+              )}
 
               {errorMsg && <ErrorBox msg={errorMsg} />}
 
@@ -296,9 +376,16 @@ export default function RegisterPage() {
           {/* ─ STEP 2: Specialization ─ */}
           {step === 2 && (
             <div className="space-y-5 animate-fade-in">
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Pilih konsentrasi program studi kamu di Informatika &apos;22:
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Pilih konsentrasi program studi kamu di Informatika &apos;22:
+                </p>
+                {avatarUrl && (
+                  <span className="text-[8px] tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full font-bold uppercase font-display shrink-0 w-fit self-start sm:self-auto">
+                    TERKUNCI DARI DATA UNIRA
+                  </span>
+                )}
+              </div>
 
               <div className="grid gap-4">
                 {SPECIALIZATIONS.map((spec) => {
@@ -308,6 +395,7 @@ export default function RegisterPage() {
                     <button
                       key={spec.id}
                       type="button"
+                      disabled={!!avatarUrl}
                       onClick={() =>
                         setSpecialization(
                           spec.id as
@@ -315,10 +403,10 @@ export default function RegisterPage() {
                           | "Smart Agriculture"
                         )
                       }
-                      className={`group w-full text-left flex items-start gap-4 p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${selected
+                      className={`group w-full text-left flex items-start gap-4 p-5 rounded-2xl border transition-all duration-300 ${selected
                         ? `bg-gradient-to-br ${spec.color} bg-opacity-10 border-white/30 shadow-xl`
                         : "bg-white/[0.03] border-white/8 hover:bg-white/[0.06] hover:border-white/15"
-                        }`}
+                        } ${avatarUrl ? "opacity-75 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <div
                         className={`p-2.5 rounded-xl shrink-0 transition-all ${selected

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sparkles, UserCheck, Menu, X, ShieldAlert } from "lucide-react";
-import { getStoredUser } from "@/components/db";
+import { getStoredUser } from "@/lib/db";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -30,7 +30,7 @@ export default function Navbar() {
   const prefix = isHome ? "" : "/";
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-40 transition-all duration-300 ${scrolled || isOpen ? "glass-navbar py-3 shadow-lg shadow-black/30" : "bg-transparent py-5"
+    <nav className={`fixed top-0 left-0 w-full z-40 transition-all duration-300 ${scrolled || isOpen || !isHome ? "glass-navbar py-3 shadow-lg shadow-black/30" : "bg-transparent py-5"
       }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-12">

@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import ParticleBackground from "@/components/ParticleBackground";
-import { getStoredUser, loginUser } from "@/components/db";
+import { getStoredUser, loginUser } from "@/lib/db";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,12 +32,12 @@ export default function LoginPage() {
     setErrorMsg("");
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 700));
-    const user = loginUser(nim, password);
-    if (user) {
+    const { student, error } = await loginUser(nim, password);
+    if (student) {
       router.push("/dashboard");
     } else {
       setIsLoading(false);
-      setErrorMsg("NIM atau password salah. Password default: password123");
+      setErrorMsg(error ?? "NIM atau password salah.");
     }
   };
 
@@ -166,17 +166,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Hint box */}
-            <div className="flex items-start gap-3 bg-violet-500/5 border border-violet-500/15 rounded-2xl p-4">
-              <Sparkles size={14} className="text-violet-400 mt-0.5 shrink-0 animate-pulse" />
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                <span className="text-zinc-200 font-semibold">Password default:</span>{" "}
-                <code className="text-cyan-400 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded-lg text-[10px]">
-                  password123
-                </code>{" "}
-                — Untuk mahasiswa yang baru mendaftar, gunakan password yang dibuat saat registrasi.
-              </p>
-            </div>
 
             {/* Error */}
             {errorMsg && (
