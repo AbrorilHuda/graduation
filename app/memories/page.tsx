@@ -36,7 +36,7 @@ export default function MemoriesPage() {
           </p>
         </div>
       </header>
-      <main className="flex-grow py-12 px-4 max-w-7xl mx-auto w-full z-20">
+      <main className="flex-grow py-12 px-4 max-w-7xl mx-auto w-full relative">
         <MemoryGallery />
       </main>
       <Footer />
